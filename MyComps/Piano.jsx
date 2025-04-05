@@ -38,39 +38,97 @@ export default function Piano() {
   const sheetContainerRef = useRef(null);
   const osmdRef = useRef(null);
   const timeoutsRef = useRef([]);
+  const [isAudioInitialized, setIsAudioInitialized] = useState(false);
 
   useEffect(() => {
+    let synth = null;
     const startTone = async () => {
-      await Tone.start();
-      synthRef.current = new Tone.PolySynth(Tone.Synth).toDestination();
+      try {
+        await Tone.start();
+        synth = new Tone.PolySynth(Tone.Synth, {
+          oscillator: {
+            type: "triangle"
+          },
+          envelope: {
+            attack: 0.005,
+            decay: 0.1,
+            sustain: 0.3,
+            release: 1
+          }
+        }).toDestination();
+        synthRef.current = synth;
+      } catch (err) {
+        console.error('Failed to initialize Tone.js:', err);
+      }
     };
     startTone();
+
+    return () => {
+      if (synth) {
+        synth.dispose();
+      }
+      clearTimeouts();
+    };
   }, []);
 
-  const playNote = (note) => {
-    if (!synthRef.current) return;
+  const initializeAudio = async () => {
+    if (isAudioInitialized) return;
     
-    setActiveKeys((prev) => [...prev, note]);
-    synthRef.current.triggerAttackRelease(note, '8n');
-    setTimeout(() => {
-      setActiveKeys((prev) => prev.filter(key => key !== note));
-    }, 200);
+    try {
+      await Tone.start();
+      const synth = new Tone.Synth({
+        volume: -6,
+        oscillator: {
+          type: "sine"
+        }
+      }).toDestination();
+      synthRef.current = synth;
+      setIsAudioInitialized(true);
+    } catch (err) {
+      console.error('Failed to initialize audio:', err);
+    }
+  };
+
+  const playNote = async (note) => {
+    try {
+      if (!isAudioInitialized) {
+        await initializeAudio();
+      }
+      
+      if (!synthRef.current) return;
+      
+      setActiveKeys((prev) => [...prev, note]);
+      synthRef.current.triggerAttackRelease(note, "8n");
+      setTimeout(() => {
+        setActiveKeys((prev) => prev.filter(key => key !== note));
+      }, 200);
+    } catch (err) {
+      console.error('Error playing note:', err);
+    }
   };
 
   const playChord = (notes) => {
-    if (!synthRef.current) return;
+    if (!synthRef.current) {
+      console.warn('Synth not initialized');
+      return;
+    }
     
-    setActiveKeys(notes);
-    synthRef.current.triggerAttackRelease(notes, '8n');
-    setTimeout(() => {
-      setActiveKeys([]);
-    }, 200);
+    try {
+      setActiveKeys(notes);
+      synthRef.current.triggerAttackRelease(notes, '8n', Tone.now());
+      setTimeout(() => {
+        setActiveKeys([]);
+      }, 200);
+    } catch (err) {
+      console.error('Error playing chord:', err);
+    }
   };
 
   const handleChatSubmit = async () => {
     if (!userInput.trim()) return;
 
-    setChatMessages(prev => [...prev, { role: 'user', content: userInput }]);
+    const newMessage = { role: 'user', content: userInput };
+    setChatMessages(prev => [...prev, newMessage]);
     setUserInput('');
     setLoading(true);
 
@@ -81,10 +139,18 @@ export default function Piano() {
         body: JSON.stringify({ message: userInput }),
       });
 
+      if (!response.ok) throw new Error('Chat request failed');
+
       const data = await response.json();
+      if (data.error) throw new Error(data.error);
+
       setChatMessages(prev => [...prev, { role: 'assistant', content: data.response }]);
     } catch (error) {
       console.error('Chat error:', error);
+      setChatMessages(prev => [...prev, { 
+        role: 'assistant', 
+        content: 'Sorry, I encountered an error. Please try again.' 
+      }]);
     } finally {
       setLoading(false);
     }
@@ -97,7 +163,22 @@ export default function Piano() {
 
   const stopPlayback = () => {
     if (synthRef.current) {
-      synthRef.current.releaseAll();
+      // For PolySynth, we can use releaseAll directly
+      synthRef.current.dispose();
+      
+      // Reinitialize the synth
+      const newSynth = new Tone.PolySynth(Tone.Synth, {
+        oscillator: {
+          type: "triangle"
+        },
+        envelope: {
+          attack: 0.005,
+          decay: 0.1,
+          sustain: 0.3,
+          release: 1
+        }
+      }).toDestination();
+      synthRef.current = newSynth;
     }
     setActiveKeys([]);
     clearTimeouts();
@@ -211,26 +292,24 @@ export default function Piano() {
     if (!synthRef.current || !parsedNotes.length) return;
     
     stopPlayback();
-    let now = Tone.now();
+    const now = Tone.now();
     let delay = 0;
 
+    const durationMap = {
+      '1n': 2,
+      '2n': 1,
+      '4n': 0.5,
+      '8n': 0.25,
+      '16n': 0.125
+    };
+
     parsedNotes.forEach(({ pitch, duration }) => {
-      let durationInSeconds = 0.5;
-      if (duration === '1n') durationInSeconds = 2;
-      else if (duration === '2n') durationInSeconds = 1;
-      else if (duration === '4n') durationInSeconds = 0.5;
-      else if (duration === '8n') durationInSeconds = 0.25;
-      else if (duration === '16n') durationInSeconds = 0.125;
+      const durationInSeconds = durationMap[duration] || 0.5;
 
-      const highlightTimeout = setTimeout(() => {
-        setActiveKeys([pitch]);
-      }, delay * 1000);
-      timeoutsRef.current.push(highlightTimeout);
-
-      const releaseTimeout = setTimeout(() => {
-        setActiveKeys([]);
-      }, (delay + durationInSeconds) * 1000);
-      timeoutsRef.current.push(releaseTimeout);
+      timeoutsRef.current.push(
+        setTimeout(() => setActiveKeys([pitch]), delay * 1000),
+        setTimeout(() => setActiveKeys([]), (delay + durationInSeconds) * 1000)
+      );
 
       synthRef.current.triggerAttackRelease(pitch, duration, now + delay);
       delay += durationInSeconds;
@@ -240,7 +319,12 @@ export default function Piano() {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-zinc-900 p-6 text-white">
       <h1 className="text-3xl font-bold mb-8 text-center">Piano Play 🎹</h1>
-
+      {!isAudioInitialized && (
+        <div className="mb-4 text-yellow-400">
+          Click any key to start audio
+        </div>
+      )}
+      
       <div className="flex w-full max-w-6xl gap-6">
         <Card className="w-1/4 min-w-[200px] h-[auto] bg-zinc-800/50 backdrop-blur-md text-white shadow-xl">
           <CardContent className="p-4 flex flex-col gap-3">
@@ -279,25 +363,72 @@ export default function Piano() {
 
         <div className="flex-1 flex flex-col items-center gap-4">
           <div className="relative flex flex-col items-center bg-zinc-800/50 backdrop-blur-md rounded-xl p-4 shadow-md">
-            <div className="flex gap-1 mb-1 relative left-4">
-              {blackKeys.map((key) => (
+            <div className="absolute top-4 flex z-10" style={{ left: "calc(2rem)" }}>
+              <div style={{ marginLeft: "1.41rem" }}>
                 <Button
-                  key={key.note}
+                  key="C#4"
                   className={`w-8 h-24 bg-zinc-900 cursor-pointer rounded-sm border border-zinc-700 hover:bg-zinc-800 
-                    ${activeKeys.includes(key.note) ? 'bg-yellow-300' : ''} 
-                    text-white text-xs z-10`}
-                  onClick={() => playNote(key.note)}
+                    ${activeKeys.includes('C#4') ? 'bg-yellow-300' : ''} 
+                    text-white text-xs`}
+                  onClick={() => playNote('C#4')}
                 >
-                  {key.label}
+                  C#
                 </Button>
-              ))}
+              </div>
+              <div style={{ marginLeft: "calc(0.5rem + 8px)" }}>
+                <Button
+                  key="D#4"
+                  className={`w-8 h-24 bg-zinc-900 cursor-pointer rounded-sm border border-zinc-700 hover:bg-zinc-800 
+                    ${activeKeys.includes('D#4') ? 'bg-yellow-300' : ''} 
+                    text-white text-xs`}
+                  onClick={() => playNote('D#4')}
+                >
+                  D#
+                </Button>
+              </div>
+              
+              <div style={{ width: "3rem" }}></div>
+              
+              <div style={{ marginLeft: "calc(2rem - 10px)" }}>
+                <Button
+                  key="F#4"
+                  className={`w-8 h-24 bg-zinc-900 cursor-pointer rounded-sm border border-zinc-700 hover:bg-zinc-800 
+                    ${activeKeys.includes('F#4') ? 'bg-yellow-300' : ''} 
+                    text-white text-xs`}
+                  onClick={() => playNote('F#4')}
+                >
+                  F#
+                </Button>
+              </div>
+              <div style={{ marginLeft: "calc(0.5rem + 8px)" }}>
+                <Button
+                  key="G#4"
+                  className={`w-8 h-24 bg-zinc-900 cursor-pointer rounded-sm border border-zinc-700 hover:bg-zinc-800 
+                    ${activeKeys.includes('G#4') ? 'bg-yellow-300' : ''} 
+                    text-white text-xs`}
+                  onClick={() => playNote('G#4')}
+                >
+                  G#
+                </Button>
+              </div>
+              <div style={{ marginLeft: "calc(0.5rem + 8px)" }}>
+                <Button
+                  key="A#4"
+                  className={`w-8 h-24 bg-zinc-900 cursor-pointer rounded-sm border border-zinc-700 hover:bg-zinc-800 
+                    ${activeKeys.includes('A#4') ? 'bg-yellow-300' : ''} 
+                    text-white text-xs`}
+                  onClick={() => playNote('A#4')}
+                >
+                  A#
+                </Button>
+              </div>
             </div>
             
             <div className="flex gap-1">
               {whiteKeys.map((key) => (
                 <Button
                   key={key.note}
-                  className={`w-12 h-32 cursor-pointer rounded-sm border border-zinc-700 
+                  className={`w-12 h-40 cursor-pointer rounded-sm border border-zinc-700 
                     ${activeKeys.includes(key.note) ? 'bg-yellow-300' : 'bg-white'} 
                     text-black hover:bg-zinc-200 text-sm`}
                   onClick={() => playNote(key.note)}
