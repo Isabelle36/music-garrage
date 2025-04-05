@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { Button } from './button'
-import { Slider } from '@radix-ui/react-slider'
 
 const Metronome = () => {
   const [isPlaying, setIsPlaying] = useState(false)
@@ -67,7 +66,7 @@ const Metronome = () => {
           max="208"
           value={tempo}
           onChange={(e) => handleTempoChange(Number(e.target.value))}
-          className="w-full"
+          className="w-full h-2 bg-zinc-600 rounded-lg appearance-none cursor-pointer"
         />
       </div>
 
