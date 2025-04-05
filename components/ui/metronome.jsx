@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { Button } from './button'
-import { Slider } from '@radix-ui/react-slider'
 
 const Metronome = () => {
   const [isPlaying, setIsPlaying] = useState(false)

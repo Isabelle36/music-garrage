@@ -1,5 +1,4 @@
 import React from 'react'
-import { Button } from "@/components/ui/button"
 import Piano from '@/components/ui/piano'
 import Metronome from '@/components/ui/metronome'
 
