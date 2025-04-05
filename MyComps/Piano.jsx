@@ -34,7 +34,10 @@ export default function Piano() {
   const [chatMessages, setChatMessages] = useState([]);
   const [userInput, setUserInput] = useState('');
   const [parsedNotes, setParsedNotes] = useState([]);
+  const [tempo, setTempo] = useState(120);
+  const [isMetronomeOn, setIsMetronomeOn] = useState(false);
   const synthRef = useRef(null);
+  const metronomeRef = useRef(null);
   const sheetContainerRef = useRef(null);
   const osmdRef = useRef(null);
   const timeoutsRef = useRef([]);
@@ -57,6 +60,18 @@ export default function Piano() {
           }
         }).toDestination();
         synthRef.current = synth;
+
+        const metronomeSynth = new Tone.Synth({
+          oscillator: { type: "square" },
+          envelope: {
+            attack: 0.001,
+            decay: 0.1,
+            sustain: 0,
+            release: 0.1
+          },
+          volume: -10
+        }).toDestination();
+        metronomeRef.current = metronomeSynth;
       } catch (err) {
         console.error('Failed to initialize Tone.js:', err);
       }
@@ -67,9 +82,46 @@ export default function Piano() {
       if (synth) {
         synth.dispose();
       }
+      if (metronomeRef.current) {
+        metronomeRef.current.dispose();
+      }
       clearTimeouts();
+      Tone.Transport.stop();
+      Tone.Transport.cancel();
     };
   }, []);
+
+  useEffect(() => {
+    const id = Tone.Transport.scheduleRepeat((time) => {
+      if (metronomeRef.current) {
+        metronomeRef.current.triggerAttackRelease('C5', '32n', time);
+      }
+    }, '4n');
+
+    return () => {
+      Tone.Transport.clear(id);
+    };
+  }, []);
+
+  useEffect(() => {
+    Tone.Transport.bpm.value = tempo;
+  }, [tempo]);
+
+  const toggleMetronome = () => {
+    if (!isMetronomeOn) {
+      Tone.Transport.start();
+    } else {
+      Tone.Transport.stop();
+    }
+    setIsMetronomeOn(!isMetronomeOn);
+  };
+
+  const handleTempoChange = (e) => {
+    const newTempo = parseInt(e.target.value);
+    if (!isNaN(newTempo) && newTempo >= 40 && newTempo <= 208) {
+      setTempo(newTempo);
+    }
+  };
 
   const initializeAudio = async () => {
     if (isAudioInitialized) return;
@@ -127,24 +179,32 @@ export default function Piano() {
   const handleChatSubmit = async () => {
     if (!userInput.trim()) return;
 
-    const newMessage = { role: 'user', content: userInput };
-    setChatMessages(prev => [...prev, newMessage]);
-    setUserInput('');
-    setLoading(true);
-
     try {
-      const response = await fetch('/api/chat', {
+      setLoading(true);
+      const newMessage = { role: 'user', content: userInput };
+      setChatMessages(prev => [...prev, newMessage]);
+      
+      const response = await fetch('/api/chat/route', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
         body: JSON.stringify({ message: userInput }),
       });
 
-      if (!response.ok) throw new Error('Chat request failed');
-
       const data = await response.json();
-      if (data.error) throw new Error(data.error);
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to get response');
+      }
 
-      setChatMessages(prev => [...prev, { role: 'assistant', content: data.response }]);
+      setChatMessages(prev => [...prev, { 
+        role: 'assistant', 
+        content: data.response 
+      }]);
+      
+      setUserInput('');
     } catch (error) {
       console.error('Chat error:', error);
       setChatMessages(prev => [...prev, { 
@@ -163,10 +223,8 @@ export default function Piano() {
 
   const stopPlayback = () => {
     if (synthRef.current) {
-      // For PolySynth, we can use releaseAll directly
       synthRef.current.dispose();
       
-      // Reinitialize the synth
       const newSynth = new Tone.PolySynth(Tone.Synth, {
         oscillator: {
           type: "triangle"
@@ -329,6 +387,28 @@ export default function Piano() {
         <Card className="w-1/4 min-w-[200px] h-[auto] bg-zinc-800/50 backdrop-blur-md text-white shadow-xl">
           <CardContent className="p-4 flex flex-col gap-3">
             <h2 className="text-lg font-semibold">Upload Sheet</h2>
+            
+            <div className="flex flex-col gap-2 mt-2 p-3 bg-zinc-700/30 rounded">
+              <h3 className="text-sm font-medium">Metronome</h3>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="40"
+                  max="208"
+                  value={tempo}
+                  onChange={handleTempoChange}
+                  className="w-16 bg-zinc-600 rounded px-2 py-1 text-sm"
+                />
+                <span className="text-sm">BPM</span>
+                <Button
+                  onClick={toggleMetronome}
+                  className={`ml-auto ${isMetronomeOn ? 'bg-red-600 hover:bg-red-500' : 'bg-emerald-600 hover:bg-emerald-500'}`}
+                >
+                  {isMetronomeOn ? '⏹' : '▶'}
+                </Button>
+              </div>
+            </div>
+
             <input
               type="file"
               accept=".mxl,.musicxml,.xml"
