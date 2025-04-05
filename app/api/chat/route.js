@@ -1,15 +1,27 @@
 import { NextResponse } from 'next/server';
 
+const API_URL = 'https://llm.api.cloud.nebius.ai/v1/chat/completions';
+
 export async function POST(request) {
   try {
     const { message } = await request.json();
     const NEBIUS_API_KEY = process.env.NEBIUS_API_KEY;
 
     if (!NEBIUS_API_KEY) {
-      throw new Error('Missing Nebius API key');
+      return NextResponse.json(
+        { error: 'API key not configured' },
+        { status: 500 }
+      );
     }
 
-    const response = await fetch('https://llm.api.cloud.nebius.ai/v1/chat/completions', {
+    if (!message?.trim()) {
+      return NextResponse.json(
+        { error: 'Message is required' },
+        { status: 400 }
+      );
+    }
+
+    const response = await fetch(API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -32,11 +44,15 @@ export async function POST(request) {
     });
 
     if (!response.ok) {
+      const error = await response.text();
+      console.error('Nebius API error:', error);
       throw new Error('Failed to get response from Nebius');
     }
 
     const data = await response.json();
-    return NextResponse.json({ response: data.choices[0].message.content });
+    return NextResponse.json({ 
+      response: data.choices[0]?.message?.content || 'No response generated'
+    });
 
   } catch (error) {
     console.error('Chat API error:', error);
