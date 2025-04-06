@@ -3,7 +3,7 @@ import Link from 'next/link'
 const Navbar = () => {
   return (
     <div className='flex justify-center'>
-    <nav className="fixed w-[70%] border border-white/15 top-5 backdrop-blur-md bg-black/30 px-4 py-3 rounded-full">
+    <nav className="fixed z-[9999] w-[70%] border border-white/15 top-5 backdrop-blur-md bg-black/30 px-4 py-3 rounded-full">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         <Link href="/" className="text-[#ff0] text-2xl font-bold hover:text-yellow-400 transition-colors duration-200 glow">
           MusicBass

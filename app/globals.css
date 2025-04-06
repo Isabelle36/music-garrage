@@ -122,4 +122,12 @@
   .glow {
     text-shadow: 0 0 10px rgba(250, 204, 21, 0.7);
   }
+  .clickable-chord {
+    cursor: pointer;
+    fill: blue; /* Highlight color */
+    font-weight: bold;
+  }
+  .clickable-chord:hover {
+    fill: darkblue; /* Hover effect */
+  }
 }
