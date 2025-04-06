@@ -60,6 +60,11 @@ export default function Piano() {
   const chatContainerRef = useRef(null);
   const [uniqueChords, setUniqueChords] = useState([]);
   const [isAudioInitialized, setIsAudioInitialized] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   useEffect(() => {
     let synth = null;
@@ -82,16 +87,20 @@ export default function Piano() {
         console.error("Failed to initialize Tone.js:", err);
       }
     };
-    startTone();
+    if (isMounted) {
+      startTone();
+    }
 
     return () => {
       if (synthRef.current) synthRef.current.dispose();
       if (metronomeRef.current) metronomeRef.current.dispose();
       clearTimeouts();
-      Tone.Transport.stop();
-      Tone.Transport.cancel();
+      if (Tone.Transport) {
+        Tone.Transport.stop();
+        Tone.Transport.cancel();
+      }
     };
-  }, []);
+  }, [isMounted]);
 
   useEffect(() => {
     const id = Tone.Transport.scheduleRepeat((time) => {
@@ -135,7 +144,7 @@ export default function Piano() {
   };
 
   const initializeAudio = async () => {
-    if (isAudioInitialized) return;
+    if (typeof window === 'undefined' || isAudioInitialized) return;
 
     try {
       await Tone.start();
@@ -256,7 +265,6 @@ export default function Piano() {
     };
     setChatMessages((prev) => [...prev, userMessage]);
   
-    // Scroll to the top of the page
     window.scrollTo({ top: 0, behavior: "smooth" });
   
     try {
@@ -337,7 +345,7 @@ export default function Piano() {
 
       const parts = root.part || [];
       const noteList = [];
-      const chordSet = new Set(); // Use a Set to store unique chords
+      const chordSet = new Set();
 
       parts.forEach((part) => {
         const measures = part.measure || [];
@@ -365,14 +373,13 @@ export default function Piano() {
 
             noteList.push({ pitch: noteName, duration });
 
-            // Add the chord to the Set
             chordSet.add(noteName);
           });
         });
       });
 
       setParsedNotes(noteList);
-      setUniqueChords(Array.from(chordSet)); // Convert Set to Array
+      setUniqueChords(Array.from(chordSet));
       console.log("Parsed Notes:", noteList);
       console.log("Unique Chords:", Array.from(chordSet));
     } catch (err) {
@@ -578,13 +585,10 @@ export default function Piano() {
     }
   };
 
-  
-  
-
   return (
     <div className="flex flex-col mt-[5%] items-center justify-center min-h-screen bg-zinc-900 p-6 text-white">
       <h1 className="text-3xl font-bold mb-8 text-center">Piano Play 🎹</h1>
-      {!isAudioInitialized && (
+      {isMounted && !isAudioInitialized && (
         <div className="mb-4 text-yellow-400">Click any key to start audio</div>
       )}
 
@@ -737,17 +741,20 @@ export default function Piano() {
 
           <div
             ref={sheetContainerRef}
-            className="w-full bg-white rounded-lg p-4 min-h-[200px] h-96 text-black overflow-y-auto"
+            className="w-full bg-white rounded-lg p-4 min-h-[200px] h-96 text-black overflow-y-auto custom-scrollbar"
           >
-            {!selectedFile && !loading && (
+            {!selectedFile && !loading && isMounted && (
               <div className="flex justify-center items-center h-full text-zinc-500">
                 Upload a MusicXML (.musicxml, .xml) or MXL (.mxl) file
               </div>
             )}
-            {loading && !parsedNotes.length && (
+            {loading && !parsedNotes.length && isMounted && (
               <div className="flex justify-center items-center h-full text-zinc-500">
                 Processing sheet...
               </div>
+            )}
+            {!isMounted && (
+              <div className="flex justify-center items-center h-full text-zinc-500">Loading...</div>
             )}
           </div>
         </div>
@@ -761,7 +768,7 @@ export default function Piano() {
               className="flex-1 overflow-y-auto mb-4 space-y-4 pr-2"
               ref={chatContainerRef}
             >
-              {chatMessages.map((msg, i) => (
+              {isMounted && chatMessages.map((msg, i) => (
                 <div
                   key={i}
                   className={`p-2 rounded ${
@@ -773,10 +780,13 @@ export default function Piano() {
                   {msg.content}
                 </div>
               ))}
-              {loading && userInput === '' && (
+              {isMounted && loading && userInput === '' && (
                 <div className="p-2 rounded bg-zinc-600/50 mr-4 overflow-hidden break-words text-yellow-400 animate-pulse">
                   AI is thinking...
                 </div>
+              )}
+              {!isMounted && (
+                <div className="p-2 rounded bg-zinc-600/50 mr-4">Loading chat...</div>
               )}
             </div>
             <div className="flex gap-2 mt-auto flex-shrink-0">
@@ -787,10 +797,11 @@ export default function Piano() {
                 placeholder="Ask about music theory..."
                 className="flex-1 bg-zinc-700/50 rounded p-2 text-white"
                 onKeyPress={(e) => e.key === "Enter" && handleChatSubmit()}
+                disabled={!isMounted}
               />
               <Button
                 onClick={handleChatSubmit}
-                disabled={loading}
+                disabled={loading || !isMounted}
                 className="bg-yellow-400 cursor-pointer text-black hover:bg-yellow-300 disabled:opacity-50"
               >
                 {loading ? "..." : "Send"}
@@ -805,7 +816,7 @@ export default function Piano() {
           <CardContent className="p-4 flex flex-col">
             <h2 className="text-lg font-semibold mb-2">Chords List</h2>
             <div className="flex flex-wrap gap-2">
-              {uniqueChords.length > 0 ? (
+              {isMounted && uniqueChords.length > 0 ? (
                 uniqueChords.map((chord, i) => (
                   <div
                     key={i}
@@ -816,12 +827,19 @@ export default function Piano() {
                   </div>
                 ))
               ) : (
-                <div className="text-zinc-500">No chords extracted yet. Upload a sheet with chords.</div>
+                isMounted && (
+                  <div className="text-zinc-500">No chords extracted yet. Upload a sheet with chords.</div>
+                )
+              )}
+              {!isMounted && (
+                <div className="text-zinc-500">Loading chords...</div>
               )}
             </div>
-            <div className="mt-2 text-sm text-zinc-400">
-              Unique Chords Found: {uniqueChords.length}
-            </div>
+            {isMounted && (
+              <div className="mt-2 text-sm text-zinc-400">
+                Unique Chords Found: {uniqueChords.length}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
