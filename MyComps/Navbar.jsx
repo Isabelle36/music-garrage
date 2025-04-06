@@ -10,9 +10,6 @@ const Navbar = () => {
         </Link>
         
         <div className="flex gap-6">
-          <Link href="/guitar" className="text-white/70 hover:text-white transition-colors duration-200">
-            Guitar
-          </Link>
           <Link href="/piano" className="text-white/70 hover:text-white transition-colors duration-200">
             Piano
           </Link>
