@@ -737,7 +737,7 @@ export default function Piano() {
 
           <div
             ref={sheetContainerRef}
-            className="w-full bg-white rounded-lg p-4 min-h-[200px] text-black overflow-auto"
+            className="w-full bg-white rounded-lg p-4 min-h-[200px] h-96 text-black overflow-y-auto"
           >
             {!selectedFile && !loading && (
               <div className="flex justify-center items-center h-full text-zinc-500">
