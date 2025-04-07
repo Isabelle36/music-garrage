@@ -50,7 +50,7 @@ https://shorturl.at/BiFeI
 ## ⚡ Setup
 
 ```bash
-git clone https://github.com/isabelle36/
+git clone https://github.com/Isabelle36/music-garrage.git
 ```
 ```bash
 cd music-garrage
