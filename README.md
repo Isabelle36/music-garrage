@@ -4,7 +4,7 @@
 **Decode. Play. Learn.**  <br><br>
 A web app that transforms sheet music into sound and insight—so musicians can learn faster and play better.
 
-Live - https://music-garrage.vercel.app/
+Live - https://music-garrage.vercel.app/ <br>
 Sample Musicxml file u can download for testing - https://shorturl.at/Xt60j
 
 ## 🚀 What It Does
