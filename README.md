@@ -36,7 +36,7 @@ Learning from sheet music can be tough—especially for beginners. We built this
 2. Then add your Nebius_Api_Key  in order to make the chat functionality to work
 
 ```bash
-Nebius_Api_Key = Your_Api_Key
+NEBIUS_API_KEY = Your_Api_Key
 ```
 
 # Here's Our PPT
