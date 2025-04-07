@@ -41,7 +41,7 @@ Learning from sheet music can be tough—especially for beginners. We built this
 NEBIUS_API_KEY = Your_Api_Key
 ```
 
-# Here's Our PPT
+# Here's Our Demo or PPT
 
 https://shorturl.at/BiFeI
 
