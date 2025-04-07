@@ -4,6 +4,8 @@
 **Decode. Play. Learn.**  <br><br>
 A web app that transforms sheet music into sound and insight—so musicians can learn faster and play better.
 
+Live - https://music-garrage.vercel.app/
+
 ## 🚀 What It Does
 
 Music Bass:
