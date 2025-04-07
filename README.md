@@ -7,6 +7,8 @@ A web app that transforms sheet music into sound and insight—so musicians can 
 Live - https://music-garrage.vercel.app/ <br>
 Sample Musicxml file u can download for testing - https://shorturl.at/Xt60j
 
+![Uploading image.png…]()
+
 ## 🚀 What It Does
 
 Music Bass:
